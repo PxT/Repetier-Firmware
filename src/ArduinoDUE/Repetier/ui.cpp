@@ -144,11 +144,11 @@ char displayCache[UI_ROWS][MAX_COLS+1];
 // .***. 14
 // *.*.* 21
 // ..*.. 4
+// ..*.. 4
+// ..*.. 4
 // ***.. 28
 // ..... 0
-// ..... 0
-// ..... 0
-const uint8_t character_back[8] PROGMEM = {4,14,21,4,28,0,0,0};
+const uint8_t character_back[8] PROGMEM = {4, 14, 21, 4, 4, 4, 28, 0};
 // Degrees sign - code 2
 // ..*.. 4
 // .*.*. 10
@@ -1258,17 +1258,24 @@ void UIDisplay::parse(const char *txt,bool ram)
 	            break;
             }
 			break;
-        case 'd':
-            if(c2 == 'o') addStringOnOff(Printer::debugEcho());
-            else if(c2 == 'i') addStringOnOff(Printer::debugInfo());
-            else if(c2 == 'e') addStringOnOff(Printer::debugErrors());
-            else if(c2 == 'd') addStringOnOff(Printer::debugDryrun());
-            break;
+        case 'd':  // debug boolean
+            if (c2 == 'o') addStringOnOff(Printer::debugEcho());
+            if (c2 == 'i') addStringOnOff(Printer::debugInfo());
+            if (c2 == 'e') addStringOnOff(Printer::debugErrors());
+            if (c2 == 'd') addStringOnOff(Printer::debugDryrun());
+            if (c2 == 'p') addStringOnOff(Printer::debugEndStop());
+            if (c2 == 'x') addStringP(Endstops::xMin() ? ui_selected : ui_unselected);
+            if (c2 == 'X') addStringP(Endstops::xMax() ? ui_selected : ui_unselected);
+            if (c2 == 'y') addStringP(Endstops::yMin() ? ui_selected : ui_unselected);
+            if (c2 == 'Y') addStringP(Endstops::yMax() ? ui_selected : ui_unselected);
+            if (c2 == 'z') addStringP(Endstops::zMin() ? ui_selected : ui_unselected);
+            if (c2 == 'Z') addStringP(Endstops::zMax() ? ui_selected : ui_unselected);
+        break;
         case 'D':
 #if FEATURE_DITTO_PRINTING
             if(c2>='0' && c2<='9')
             {
-                addStringP(Extruder::dittoMode==c2-'0'?ui_selected:ui_unselected);
+                addStringP(Extruder::dittoMode==c2-'0' ? ui_selected : ui_unselected);
             }
 #endif
             break;
@@ -1824,6 +1831,7 @@ void sdrefresh(uint16_t &r,char cache[UI_ROWS][MAX_COLS+1])
 // Refresh current menu page
 void UIDisplay::refreshPage()
 {
+   Endstops::update();
 #if  UI_DISPLAY_TYPE == DISPLAY_GAMEDUINO2
     GD2::refresh();
 #else
@@ -1837,8 +1845,8 @@ void UIDisplay::refreshPage()
         ui_autoreturn_time = HAL::timeInMilliseconds() + UI_AUTORETURN_TO_MENU_AFTER;
 #endif
     encoderStartScreen = uid.encoderLast;
-
     // Copy result into cache
+    Endstops::update();
     if(menuLevel == 0) // Top level menu
     {
         UIMenu *men = (UIMenu*)pgm_read_word(&(ui_pages[menuPos[0]]));
@@ -3063,6 +3071,9 @@ int UIDisplay::executeAction(unsigned int action, bool allowMoves)
             break;
         case UI_ACTION_DEBUG_ERROR:
             Printer::toggleErrors();
+            break;
+        case UI_ACTION_DEBUG_ENDSTOP:
+            Printer::toggleEndStop();
             break;
         case UI_ACTION_DEBUG_DRYRUN:
             Printer::toggleDryRun();

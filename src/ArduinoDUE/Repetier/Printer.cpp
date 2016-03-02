@@ -236,9 +236,7 @@ void Endstops::update() {
         lastState2 = lastRead2;
         accumulator2 |= lastState2;
 #endif
-#ifdef DEBUG_ENDSTOPS
-        report();
-#endif
+    if (Printer::debugEndStop())  Endstops::report();
     } else {
         lastState = lastRead;
 #ifdef EXTENDED_ENDSTOPS
@@ -293,23 +291,23 @@ void Printer::constrainDestinationCoords()
 {
     if(isNoDestinationCheck()) return;
 #if min_software_endstop_x
-    if (destinationSteps[X_AXIS] < xMinSteps) Printer::destinationSteps[X_AXIS] = Printer::xMinSteps;
+    if (Printer::destinationSteps[X_AXIS] < xMinSteps) Printer::destinationSteps[X_AXIS] = Printer::xMinSteps;
 #endif
 #if min_software_endstop_y
-    if (destinationSteps[Y_AXIS] < yMinSteps) Printer::destinationSteps[Y_AXIS] = Printer::yMinSteps;
+    if (Printer::destinationSteps[Y_AXIS] < yMinSteps) Printer::destinationSteps[Y_AXIS] = Printer::yMinSteps;
 #endif
 #if min_software_endstop_z
-    if (isAutolevelActive() == false && destinationSteps[Z_AXIS] < zMinSteps && !isZProbingActive()) Printer::destinationSteps[Z_AXIS] = Printer::zMinSteps;
+    if (isAutolevelActive() == false && Printer::destinationSteps[Z_AXIS] < zMinSteps && !isZProbingActive()) Printer::destinationSteps[Z_AXIS] = Printer::zMinSteps;
 #endif
 
 #if max_software_endstop_x
-    if (destinationSteps[X_AXIS] > Printer::xMaxSteps) Printer::destinationSteps[X_AXIS] = Printer::xMaxSteps;
+    if (Printer::destinationSteps[X_AXIS] > Printer::xMaxSteps) Printer::destinationSteps[X_AXIS] = Printer::xMaxSteps;
 #endif
 #if max_software_endstop_y
-    if (destinationSteps[Y_AXIS] > Printer::yMaxSteps) Printer::destinationSteps[Y_AXIS] = Printer::yMaxSteps;
+    if (Printer::destinationSteps[Y_AXIS] > Printer::yMaxSteps) Printer::destinationSteps[Y_AXIS] = Printer::yMaxSteps;
 #endif
 #if max_software_endstop_z
-    if (isAutolevelActive() == false && destinationSteps[Z_AXIS] > Printer::zMaxSteps && !isZProbingActive()) Printer::destinationSteps[Z_AXIS] = Printer::zMaxSteps;
+    if (isAutolevelActive() == false && Printer::destinationSteps[Z_AXIS] > Printer::zMaxSteps && !isZProbingActive()) Printer::destinationSteps[Z_AXIS] = Printer::zMaxSteps;
 #endif
 	EVENT_CONTRAIN_DESTINATION_COORDINATES
 }
@@ -336,10 +334,13 @@ void Printer::toggleCommunication() {
 void Printer::toggleNoMoves() {
 	setDebugLevel(debugLevel ^ 32);
 }
+void Printer::toggleEndStop() {
+  setDebugLevel(debugLevel ^ 64);
+}
 	
 bool Printer::isPositionAllowed(float x,float y,float z)
 {
-    if(isNoDestinationCheck())  return true;
+    if(isNoDestinationCheck()) return true;
     bool allowed = true;
 #if DRIVE_SYSTEM == DELTA
     allowed &= (z >= 0) && (z <= zLength + 0.05 + ENDSTOP_Z_BACK_ON_HOME);
@@ -400,6 +401,8 @@ void Printer::updateDerivedParameter()
 #if NONLINEAR_SYSTEM
     travelMovesPerSecond = EEPROM::deltaSegmentsPerSecondMove();
     printMovesPerSecond = EEPROM::deltaSegmentsPerSecondPrint();
+	if(travelMovesPerSecond < 15) travelMovesPerSecond = 15; // lower values make no sense and can cause serious problems
+	if(printMovesPerSecond < 15) printMovesPerSecond = 15;
 #endif
 #if DRIVE_SYSTEM == DELTA
     axisStepsPerMM[X_AXIS] = axisStepsPerMM[Y_AXIS] = axisStepsPerMM[Z_AXIS];
@@ -2125,7 +2128,7 @@ bool Distortion::measure(void)
 
 int32_t Distortion::correct(int32_t x, int32_t y, int32_t z) const
 {
-    if (!enabled || z > zEnd || Printer::isZProbingActive()) return 0.0f;
+    if (!enabled || z > zEnd || Printer::isZProbingActive()) return 0;
     if(false && z == 0) {
   Com::printF(PSTR("correcting ("), x); Com::printF(PSTR(","), y);
     }
@@ -2180,7 +2183,8 @@ int32_t Distortion::correct(int32_t x, int32_t y, int32_t z) const
       Com::printF(PSTR(" iy= "), fyFloor); Com::printFLN(PSTR(" fy= "), fy);
     }
     if (z > zStart && z > 0)
-        correction_z *= (zEnd - z) / (zEnd - zStart);
+        //All variables are type int. For calculation we need float values
+        correction_z = (correction_z * static_cast<float>(zEnd - z) / (zEnd - zStart));
    /* if(correction_z > 20 || correction_z < -20) {
             Com::printFLN(PSTR("Corr. error too big:"),correction_z);
         Com::printF(PSTR("fxf"),(int)fxFloor);

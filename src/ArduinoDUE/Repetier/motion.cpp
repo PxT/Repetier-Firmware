@@ -1543,6 +1543,12 @@ bool NonlinearSegment::checkEndstops(PrintLine *cur, bool checkall)
 	        cur->setZMoveFinished();
 	        r = 1;
         }
+	    if(cur->isZNegativeMove() && Endstops::zMin())
+		{
+			setZMoveFinished();
+			cur->setZMoveFinished();
+			r = 1;
+		}
 #else		
 		// endstops are per motor and do not depend on global axis movement
         if(isXPositiveMove() && Endstops::xMax())
@@ -1589,15 +1595,17 @@ bool NonlinearSegment::checkEndstops(PrintLine *cur, bool checkall)
             cur->setZMoveFinished();
 			r++;
         }
+		if(isZNegativeMove() && Endstops::zMin())
+		{
+			setZMoveFinished();
+			cur->setZMoveFinished();
+			r++;
+		}
+#if DRIVE_SYSTEM == DELTA		
 		if(Printer::isHoming())
-			return r == 3;			
-#endif		
-    }
-    if(isZNegativeMove() && Endstops::zMin())
-    {
-        setZMoveFinished();
-        cur->setZMoveFinished();
-		r++;
+			return r == 3;
+#endif			
+#endif // Not gantry		
     }
 	return r != 0;
 }
@@ -1606,7 +1614,7 @@ void PrintLine::calculateDirectionAndDelta(int32_t difference[], ufast8_t *dir, 
 {
     *dir = 0;
     //Find direction
-	if(difference[X_AXIS]) {
+	if(difference[X_AXIS] != 0) {
 		if(difference[X_AXIS] < 0) {
 			delta[X_AXIS] = -difference[X_AXIS];
             *dir |= XSTEP;
@@ -1618,7 +1626,7 @@ void PrintLine::calculateDirectionAndDelta(int32_t difference[], ufast8_t *dir, 
 		delta[X_AXIS] = 0;
 	}
 
-	if(difference[Y_AXIS]) {
+	if(difference[Y_AXIS] != 0) {
 		if(difference[Y_AXIS] < 0) {
 			delta[Y_AXIS] = -difference[Y_AXIS];
 			*dir |= YSTEP;
@@ -1629,7 +1637,7 @@ void PrintLine::calculateDirectionAndDelta(int32_t difference[], ufast8_t *dir, 
 	} else {
 		delta[Y_AXIS] = 0;
 	}
-	if(difference[Z_AXIS]) {
+	if(difference[Z_AXIS] != 0) {
 		if(difference[Z_AXIS] < 0) {
 			delta[Z_AXIS] = -difference[Z_AXIS];
 			*dir |= ZSTEP;
@@ -1640,7 +1648,7 @@ void PrintLine::calculateDirectionAndDelta(int32_t difference[], ufast8_t *dir, 
 	} else {
 			delta[Z_AXIS] = 0;
 	}
-	if(difference[E_AXIS]) {
+	if(difference[E_AXIS] != 0) {
 		if(difference[E_AXIS] < 0) {
 			delta[E_AXIS] = -difference[E_AXIS];
 			*dir |= ESTEP;
@@ -1941,7 +1949,7 @@ uint8_t PrintLine::queueNonlinearMove(uint8_t check_endstops,uint8_t pathOptimiz
 #ifdef DEBUG_SPLIT
         Com::printFLN(Com::tDBGDeltaZDelta, cartesianDeltaSteps[Z_AXIS]);
 #endif
-        segmentCount = (cartesianDeltaSteps[Z_AXIS] + (uint32_t)65530) / (uint32_t)65529; // not limit as t is used to flag errors
+        segmentCount = (cartesianDeltaSteps[Z_AXIS] + (uint32_t)43680) / (uint32_t)43679; // can not go to 65535 for rounding issues causing overflow later in some cases!
     }
     // Now compute the number of lines needed	
     int numLines = (segmentCount + DELTASEGMENTS_PER_PRINTLINE - 1) / DELTASEGMENTS_PER_PRINTLINE;
